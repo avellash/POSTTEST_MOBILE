@@ -1,83 +1,57 @@
-import 'package:flutter/material.dart';
 
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../providers/trainee_provider.dart';
+import '../widgets/trainee_card.dart';
+import '../widgets/popular_trainee.dart';
+import '../widgets/voting_card.dart';
 import 'vote_page.dart';
 import 'trainee_page.dart';
 import 'profile_page.dart';
 import 'trainee_detail_page.dart';
-import '../widgets/trainee_card.dart';
-import '../widgets/popular_trainee.dart';
-import '../widgets/voting_card.dart';
 
-class HomePage extends StatefulWidget {
+class HomePage extends StatelessWidget {
   const HomePage({super.key});
 
   @override
-  State<HomePage> createState() => _HomePageState();
-}
-
-class _HomePageState extends State<HomePage> {
-  int selectedIndex = 0;
-  String searchText = '';
-
-  final List<Map<String, dynamic>> trainees = [
-    {
-      'name': 'jiyoon',
-      'icon': Icons.person,
-    },
-    {
-      'name': 'jeemin',
-      'icon': Icons.person,
-    },
-    {
-      'name': 'koko',
-      'icon': Icons.person,
-    },
-    {
-      'name': 'sarang',
-      'icon': Icons.person,
-    },
-  ];
-
-  @override
   Widget build(BuildContext context) {
-    // membangun halaman utama.
+    // Mengambil state terbaru dari Provider.
+    final provider = context.watch<TraineeProvider>();
+
+    // Menyiapkan halaman untuk navigasi bawah.
     final pages = [
-      buildHomeContent(),
+      buildHomeContent(context, provider),
       const VotePage(),
       const TraineePage(),
       const ProfilePage(),
     ];
 
     return Scaffold(
+      // Mempertahankan halaman agar state widget tidak mudah hilang.
       body: IndexedStack(
-        index: selectedIndex,
+        index: provider.selectedIndex,
         children: pages,
       ),
-      bottomNavigationBar: buildBottomNavigation(),
+      bottomNavigationBar: buildBottomNavigation(context, provider),
     );
   }
 
-  Widget buildHomeContent() {
-    // membuat isi halaman home.
-    final filteredTrainees = trainees
-        .where(
-          (trainee) => trainee['name']
-          .toString()
-          .toLowerCase()
-          .contains(searchText.toLowerCase()),
-    )
-        .toList();
-
+  Widget buildHomeContent(
+      BuildContext context,
+      TraineeProvider provider,
+      ) {
     return SafeArea(
       child: RefreshIndicator(
-        onRefresh: refreshHome,
+        // Memanggil fungsi refresh dari Provider.
+        onRefresh: provider.refreshHome,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              buildHeader(),
+              buildHeader(context),
 
               const SizedBox(height: 28),
 
@@ -103,7 +77,7 @@ class _HomePageState extends State<HomePage> {
 
               const SizedBox(height: 22),
 
-              buildSearch(),
+              buildSearch(provider),
 
               const SizedBox(height: 28),
 
@@ -121,12 +95,11 @@ class _HomePageState extends State<HomePage> {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
+
                   TextButton(
                     onPressed: () {
-                      // membuka halaman trainee.
-                      setState(() {
-                        selectedIndex = 2;
-                      });
+                      // Membuka halaman daftar trainee.
+                      provider.changePage(2);
                     },
                     child: const Text('lihat semua'),
                   ),
@@ -135,27 +108,35 @@ class _HomePageState extends State<HomePage> {
 
               const SizedBox(height: 15),
 
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: filteredTrainees.length,
-                gridDelegate:
-                const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
-                  childAspectRatio: 0.78,
-                ),
-                itemBuilder: (context, index) {
-                  // membuat kartu trainee.
-                  final trainee = filteredTrainees[index];
+              // Menampilkan hasil pencarian dari Provider.
+              if (provider.filteredTrainees.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Center(
+                    child: Text('Trainee tidak ditemukan.'),
+                  ),
+                )
+              else
+                GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: provider.filteredTrainees.length,
+                  gridDelegate:
+                  const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                    childAspectRatio: 0.78,
+                  ),
+                  itemBuilder: (context, index) {
+                    final trainee = provider.filteredTrainees[index];
 
-                  return TraineeCard(
-                    name: trainee['name'].toString(),
-                    icon: trainee['icon'] as IconData,
-                  );
-                },
-              ),
+                    return TraineeCard(
+                      name: trainee['name'].toString(),
+                      icon: trainee['icon'] as IconData,
+                    );
+                  },
+                ),
 
               const SizedBox(height: 30),
 
@@ -169,14 +150,16 @@ class _HomePageState extends State<HomePage> {
 
               const SizedBox(height: 15),
 
+              // Menggunakan daftar trainee dari Provider.
               ListView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                itemCount: 3,
+                itemCount: provider.trainees.length < 3
+                    ? provider.trainees.length
+                    : 3,
                 itemBuilder: (context, index) {
-                  // membuat daftar trainee populer.
                   return PopularTrainee(
-                    name: trainees[index]['name'].toString(),
+                    name: provider.trainees[index]['name'].toString(),
                   );
                 },
               ),
@@ -189,8 +172,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget buildHeader() {
-    // membuat header halaman.
+  Widget buildHeader(BuildContext context) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -204,7 +186,7 @@ class _HomePageState extends State<HomePage> {
 
         IconButton(
           onPressed: () {
-            // membuka halaman detail trainee.
+            // Membuka detail trainee.
             Navigator.push(
               context,
               MaterialPageRoute(
@@ -214,23 +196,16 @@ class _HomePageState extends State<HomePage> {
               ),
             );
           },
-          icon: const Icon(
-            Icons.notifications_none,
-          ),
+          icon: const Icon(Icons.notifications_none),
         ),
       ],
     );
   }
 
-  Widget buildSearch() {
-    // membuat search bar.
+  Widget buildSearch(TraineeProvider provider) {
     return TextField(
-      onChanged: (value) {
-        // memperbarui kata pencarian.
-        setState(() {
-          searchText = value;
-        });
-      },
+      // Mengirim kata pencarian ke Provider.
+      onChanged: provider.updateSearch,
       decoration: InputDecoration(
         hintText: 'cari trainee...',
         hintStyle: const TextStyle(
@@ -250,24 +225,19 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget buildBottomNavigation() {
-    // membuat navigasi bawah.
+  Widget buildBottomNavigation(
+      BuildContext context,
+      TraineeProvider provider,
+      ) {
     return BottomNavigationBar(
-      currentIndex: selectedIndex,
+      currentIndex: provider.selectedIndex,
 
-      onTap: (index) {
-        // mengganti halaman aktif.
-        setState(() {
-          selectedIndex = index;
-        });
-      },
+      // Mengganti halaman melalui Provider.
+      onTap: provider.changePage,
 
       type: BottomNavigationBarType.fixed,
-
       backgroundColor: const Color(0xFF151B3D),
-
       selectedItemColor: const Color(0xFF8B7FFF),
-
       unselectedItemColor: const Color(0xFFAEB6D9),
 
       items: const [
@@ -293,14 +263,5 @@ class _HomePageState extends State<HomePage> {
         ),
       ],
     );
-  }
-
-  Future<void> refreshHome() async {
-    // memperbarui data halaman.
-    await Future.delayed(
-      const Duration(seconds: 1),
-    );
-
-    setState(() {});
   }
 }

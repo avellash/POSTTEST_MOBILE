@@ -1,31 +1,22 @@
-import 'package:flutter/material.dart';
 
-class VotePage extends StatefulWidget {
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../providers/trainee_provider.dart';
+
+class VotePage extends StatelessWidget {
   const VotePage({super.key});
 
   @override
-  State<VotePage> createState() => _VotePageState();
-}
-
-class _VotePageState extends State<VotePage> {
-  int selectedTrainee = -1;
-
-  final List<String> trainees = [
-    'jiyoon',
-    'jeemin',
-    'koko',
-    'sarang',
-  ];
-
-  @override
   Widget build(BuildContext context) {
-    // membangun halaman voting.
+    // Mengambil pilihan voting dari Provider.
+    final provider = context.watch<TraineeProvider>();
+
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
-          crossAxisAlignment:
-          CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
               'vote trainee',
@@ -48,34 +39,26 @@ class _VotePageState extends State<VotePage> {
 
             Expanded(
               child: ListView.builder(
-                itemCount: trainees.length,
+                itemCount: provider.voteTrainees.length,
                 itemBuilder: (context, index) {
-                  // membuat pilihan trainee.
                   return Card(
                     color: const Color(0xFF151B3D),
                     child: RadioListTile<int>(
                       value: index,
-                      groupValue: selectedTrainee,
+                      groupValue: provider.selectedVoteIndex,
 
+                      // Menyimpan pilihan ke Provider.
                       onChanged: (value) {
-                        // menyimpan pilihan trainee.
-                        setState(() {
-                          selectedTrainee =
-                              value ?? -1;
-                        });
+                        if (value != null) {
+                          provider.selectVote(value);
+                        }
                       },
 
-                      title: Text(
-                        trainees[index],
-                      ),
+                      title: Text(provider.voteTrainees[index]),
 
-                      secondary:
-                      const CircleAvatar(
-                        backgroundColor:
-                        Color(0xFF252B50),
-                        child: Icon(
-                          Icons.person,
-                        ),
+                      secondary: const CircleAvatar(
+                        backgroundColor: Color(0xFF252B50),
+                        child: Icon(Icons.person),
                       ),
                     ),
                   );
@@ -86,27 +69,25 @@ class _VotePageState extends State<VotePage> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: selectedTrainee == -1
+                onPressed: provider.selectedVoteIndex == -1
                     ? null
-                    : submitVote,
-                child: const Text(
-                  'kirim vote',
-                ),
+                    : () {
+                  final trainee = provider.voteTrainees[
+                  provider.selectedVoteIndex];
+
+                  // Menampilkan konfirmasi pilihan voting.
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'vote untuk $trainee berhasil.',
+                      ),
+                    ),
+                  );
+                },
+                child: const Text('kirim vote'),
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  void submitVote() {
-    // menampilkan hasil vote.
-    ScaffoldMessenger.of(context)
-        .showSnackBar(
-      SnackBar(
-        content: Text(
-          'vote untuk ${trainees[selectedTrainee]} berhasil.',
         ),
       ),
     );

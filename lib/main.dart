@@ -1,9 +1,18 @@
+
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
 import 'pages/home_page.dart';
+import 'providers/trainee_provider.dart';
 
 void main() {
-  // menjalankan aplikasi flutter.
-  runApp(const MyApp());
+  // Menjalankan aplikasi dengan Provider.
+  runApp(
+    ChangeNotifierProvider(
+      create: (context) => TraineeProvider(),
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -11,18 +20,13 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // membuat konfigurasi utama aplikasi.
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-
       title: 'i-land 2 voting',
 
       theme: ThemeData(
         brightness: Brightness.dark,
-
-        scaffoldBackgroundColor:
-        const Color(0xFF0B1026),
-
+        scaffoldBackgroundColor: const Color(0xFF0B1026),
         fontFamily: 'Arial',
 
         colorScheme: ColorScheme.fromSeed(
@@ -36,33 +40,27 @@ class MyApp extends StatelessWidget {
           elevation: 0,
         ),
 
-        elevatedButtonTheme:
-        ElevatedButtonThemeData(
+        elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
-            backgroundColor:
-            const Color(0xFF8B7FFF),
+            backgroundColor: const Color(0xFF8B7FFF),
             foregroundColor: Colors.white,
             shape: RoundedRectangleBorder(
-              borderRadius:
-              BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(10),
             ),
           ),
         ),
 
-        inputDecorationTheme:
-        InputDecorationTheme(
+        inputDecorationTheme: InputDecorationTheme(
           filled: true,
-          fillColor:
-          const Color(0xFF151B3D),
+          fillColor: const Color(0xFF151B3D),
           border: OutlineInputBorder(
-            borderRadius:
-            BorderRadius.circular(15),
+            borderRadius: BorderRadius.circular(15),
             borderSide: BorderSide.none,
           ),
         ),
       ),
 
-      // menentukan halaman pertama aplikasi.
+      // Menentukan halaman pertama aplikasi.
       home: const HomePage(),
     );
   }

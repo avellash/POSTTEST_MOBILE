@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 
 class ProfilePage extends StatelessWidget {
@@ -5,19 +6,17 @@ class ProfilePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // membangun halaman profil.
+    // Menampilkan halaman profil pengguna.
     return SafeArea(
       child: Center(
         child: Padding(
           padding: const EdgeInsets.all(20),
           child: Column(
-            mainAxisAlignment:
-            MainAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               const CircleAvatar(
                 radius: 45,
-                backgroundColor:
-                Color(0xFF252B50),
+                backgroundColor: Color(0xFF252B50),
                 child: Icon(
                   Icons.person,
                   size: 50,
@@ -38,22 +37,15 @@ class ProfilePage extends StatelessWidget {
 
               ElevatedButton.icon(
                 onPressed: () {
-                  // menampilkan pesan profil.
-                  ScaffoldMessenger.of(context)
-                      .showSnackBar(
+                  // Memberikan informasi bahwa profil aktif.
+                  ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text(
-                        'halaman profil aktif.',
-                      ),
+                      content: Text('halaman profil aktif.'),
                     ),
                   );
                 },
-                icon: const Icon(
-                  Icons.person,
-                ),
-                label: const Text(
-                  'profil saya',
-                ),
+                icon: const Icon(Icons.person),
+                label: const Text('profil saya'),
               ),
             ],
           ),
