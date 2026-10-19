@@ -1,12 +1,22 @@
 
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 
-import 'pages/home_page.dart';
+import 'firebase_options.dart';
+import 'pages/auth_page.dart';
 import 'providers/trainee_provider.dart';
 
-void main() {
-  // Menjalankan aplikasi dengan Provider.
+Future<void> main() async {
+  // Memastikan Flutter siap sebelum Firebase dijalankan.
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Menghubungkan aplikasi dengan proyek Firebase.
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
+  // Provider tetap digunakan untuk mengelola data trainee.
   runApp(
     ChangeNotifierProvider(
       create: (context) => TraineeProvider(),
@@ -23,23 +33,19 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'i-land 2 voting',
-
       theme: ThemeData(
         brightness: Brightness.dark,
         scaffoldBackgroundColor: const Color(0xFF0B1026),
         fontFamily: 'Arial',
-
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xFF8B7FFF),
           brightness: Brightness.dark,
         ),
-
         appBarTheme: const AppBarTheme(
           backgroundColor: Color(0xFF0B1026),
           foregroundColor: Colors.white,
           elevation: 0,
         ),
-
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFF8B7FFF),
@@ -49,7 +55,6 @@ class MyApp extends StatelessWidget {
             ),
           ),
         ),
-
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
           fillColor: const Color(0xFF151B3D),
@@ -60,8 +65,8 @@ class MyApp extends StatelessWidget {
         ),
       ),
 
-      // Menentukan halaman pertama aplikasi.
-      home: const HomePage(),
+      // AuthGate menentukan halaman berdasarkan status login.
+      home: const AuthGate(),
     );
   }
 }

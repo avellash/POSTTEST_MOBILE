@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "684935356313",
+    "project_id": "i-land-2",
+    "storage_bucket": "i-land-2.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:684935356313:android:6a071384208b6ccb1b7d08",
+        "android_client_info": {
+          "package_name": "com.example.posttest"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDfI0FGQ-oz1Tyvae0qCkMuT-MjWA7p7hM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
