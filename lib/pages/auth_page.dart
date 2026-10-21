@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'home_page.dart';
 
@@ -16,7 +17,9 @@ class AuthGate extends StatelessWidget {
           return const Scaffold(
             backgroundColor: Color(0xFF0B1026),
             body: Center(
-              child: CircularProgressIndicator(color: Color(0xFF8B7FFF)),
+              child: CircularProgressIndicator(
+                color: Color(0xFF8B7FFF),
+              ),
             ),
           );
         }
@@ -58,15 +61,44 @@ class _AuthPageState extends State<AuthPage> {
 
     try {
       if (_isRegister) {
-        if (_passwordController.text != _confirmPasswordController.text) {
+        // Memastikan konfirmasi password sesuai.
+        if (_passwordController.text !=
+            _confirmPasswordController.text) {
           throw Exception('Konfirmasi password tidak cocok.');
         }
 
+        // Membuat akun baru di Firebase Authentication.
+        final credential =
         await FirebaseAuth.instance.createUserWithEmailAndPassword(
           email: _emailController.text.trim(),
           password: _passwordController.text,
         );
+
+        // Mengambil data akun yang baru dibuat.
+        final user = credential.user;
+
+        if (user != null) {
+          final email = user.email ?? '';
+          final username = email.split('@').first;
+
+          // Membuat dokumen profil awal secara otomatis.
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .set({
+            'uid': user.uid,
+            'email': email,
+            'username': username.length > 30
+                ? username.substring(0, 30)
+                : username,
+            'profilePicture': 'pp_1',
+            'voteCount': 0,
+          }, SetOptions(merge: true));
+        }
+
+        _showMessage('Registrasi berhasil! Profil berhasil dibuat.');
       } else {
+        // Login menggunakan akun yang sudah terdaftar.
         await FirebaseAuth.instance.signInWithEmailAndPassword(
           email: _emailController.text.trim(),
           password: _passwordController.text,
@@ -100,8 +132,16 @@ class _AuthPageState extends State<AuthPage> {
       }
 
       _showMessage(message);
+    } on FirebaseException catch (e) {
+      // Menangani kesalahan saat menyimpan profil ke Firestore.
+      _showMessage(
+        'Akun berhasil dibuat, tetapi profil gagal disimpan. '
+            'Periksa koneksi dan Firestore Rules. (${e.code})',
+      );
     } catch (e) {
-      _showMessage(e.toString().replaceFirst('Exception: ', ''));
+      _showMessage(
+        e.toString().replaceFirst('Exception: ', ''),
+      );
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -113,8 +153,9 @@ class _AuthPageState extends State<AuthPage> {
   void _showMessage(String message) {
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
   }
 
   @override
@@ -134,7 +175,11 @@ class _AuthPageState extends State<AuthPage> {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Color(0xFF101A3C), Color(0xFF0B1026), Color(0xFF17102E)],
+            colors: [
+              Color(0xFF101A3C),
+              Color(0xFF0B1026),
+              Color(0xFF17102E),
+            ],
           ),
         ),
         child: SafeArea(
@@ -151,6 +196,7 @@ class _AuthPageState extends State<AuthPage> {
                       size: 72,
                       color: Color(0xFF8B7FFF),
                     ),
+
                     const SizedBox(height: 16),
 
                     const Text(
@@ -209,25 +255,24 @@ class _AuthPageState extends State<AuthPage> {
                       controller: _passwordController,
                       obscureText: _obscurePassword,
                       style: const TextStyle(color: Colors.white),
-                      decoration:
-                          _inputDecoration(
-                            'Password',
-                            Icons.lock_outline,
-                          ).copyWith(
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                _obscurePassword
-                                    ? Icons.visibility_off
-                                    : Icons.visibility,
-                                color: Colors.white70,
-                              ),
-                              onPressed: () {
-                                setState(() {
-                                  _obscurePassword = !_obscurePassword;
-                                });
-                              },
-                            ),
+                      decoration: _inputDecoration(
+                        'Password',
+                        Icons.lock_outline,
+                      ).copyWith(
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _obscurePassword
+                                ? Icons.visibility_off
+                                : Icons.visibility,
+                            color: Colors.white70,
                           ),
+                          onPressed: () {
+                            setState(() {
+                              _obscurePassword = !_obscurePassword;
+                            });
+                          },
+                        ),
+                      ),
                       validator: (value) {
                         if (value == null || value.isEmpty) {
                           return 'Password wajib diisi.';
@@ -282,20 +327,20 @@ class _AuthPageState extends State<AuthPage> {
                         ),
                         child: _isLoading
                             ? const SizedBox(
-                                height: 22,
-                                width: 22,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
+                          height: 22,
+                          width: 22,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
                             : Text(
-                                _isRegister ? 'Daftar' : 'Login',
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
+                          _isRegister ? 'Daftar' : 'Login',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
                     ),
 
@@ -306,17 +351,21 @@ class _AuthPageState extends State<AuthPage> {
                       onPressed: _isLoading
                           ? null
                           : () {
-                              setState(() {
-                                _isRegister = !_isRegister;
-                                _formKey.currentState?.reset();
-                                _confirmPasswordController.clear();
-                              });
-                            },
+                        setState(() {
+                          _isRegister = !_isRegister;
+                          _formKey.currentState?.reset();
+                          _emailController.clear();
+                          _passwordController.clear();
+                          _confirmPasswordController.clear();
+                        });
+                      },
                       child: Text(
                         _isRegister
                             ? 'Sudah punya akun? Login'
                             : 'Belum punya akun? Daftar',
-                        style: const TextStyle(color: Color(0xFFB9B0FF)),
+                        style: const TextStyle(
+                          color: Color(0xFFB9B0FF),
+                        ),
                       ),
                     ),
                   ],
@@ -334,7 +383,10 @@ class _AuthPageState extends State<AuthPage> {
     return InputDecoration(
       labelText: label,
       labelStyle: const TextStyle(color: Colors.white70),
-      prefixIcon: Icon(icon, color: const Color(0xFFB9B0FF)),
+      prefixIcon: Icon(
+        icon,
+        color: const Color(0xFFB9B0FF),
+      ),
       filled: true,
       fillColor: Colors.white.withValues(alpha: 0.06),
       border: OutlineInputBorder(
@@ -347,7 +399,10 @@ class _AuthPageState extends State<AuthPage> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: Color(0xFF8B7FFF), width: 1.5),
+        borderSide: const BorderSide(
+          color: Color(0xFF8B7FFF),
+          width: 1.5,
+        ),
       ),
       errorStyle: const TextStyle(color: Colors.orangeAccent),
     );

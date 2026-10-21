@@ -5,7 +5,6 @@ import 'package:provider/provider.dart';
 import '../providers/trainee_provider.dart';
 import '../widgets/trainee_card.dart';
 import '../widgets/popular_trainee.dart';
-import '../widgets/voting_card.dart';
 import 'vote_page.dart';
 import 'trainee_page.dart';
 import 'profile_page.dart';
@@ -13,6 +12,11 @@ import 'trainee_detail_page.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
+
+  static const Color backgroundColor = Color(0xFF0B102B);
+  static const Color cardColor = Color(0xFF151B3D);
+  static const Color accentColor = Color(0xFF8B7FFF);
+  static const Color secondaryColor = Color(0xFFAEB6D9);
 
   @override
   Widget build(BuildContext context) {
@@ -27,19 +31,20 @@ class HomePage extends StatelessWidget {
     ];
 
     return Scaffold(
+      backgroundColor: backgroundColor,
       body: Row(
         children: [
           if (isDesktop)
             NavigationRail(
-              backgroundColor: const Color(0xFF151B3D),
+              backgroundColor: cardColor,
               selectedIndex: provider.selectedIndex,
               onDestinationSelected: provider.changePage,
               labelType: NavigationRailLabelType.all,
               selectedIconTheme: const IconThemeData(
-                color: Color(0xFF8B7FFF),
+                color: accentColor,
               ),
               unselectedIconTheme: const IconThemeData(
-                color: Color(0xFFAEB6D9),
+                color: secondaryColor,
               ),
               destinations: const [
                 NavigationRailDestination(
@@ -74,9 +79,9 @@ class HomePage extends StatelessWidget {
         currentIndex: provider.selectedIndex,
         onTap: provider.changePage,
         type: BottomNavigationBarType.fixed,
-        backgroundColor: const Color(0xFF151B3D),
-        selectedItemColor: const Color(0xFF8B7FFF),
-        unselectedItemColor: const Color(0xFFAEB6D9),
+        backgroundColor: cardColor,
+        selectedItemColor: accentColor,
+        unselectedItemColor: secondaryColor,
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.home_outlined),
@@ -136,7 +141,7 @@ class HomePage extends StatelessWidget {
                       'dukung trainee favoritmu untuk melangkah lebih jauh.',
                       style: TextStyle(
                         fontSize: 14,
-                        color: Color(0xFFAEB6D9),
+                        color: secondaryColor,
                       ),
                     ),
 
@@ -148,14 +153,14 @@ class HomePage extends StatelessWidget {
                       decoration: InputDecoration(
                         hintText: 'cari trainee...',
                         hintStyle: const TextStyle(
-                          color: Color(0xFFAEB6D9),
+                          color: secondaryColor,
                         ),
                         prefixIcon: const Icon(
                           Icons.search,
-                          color: Color(0xFFAEB6D9),
+                          color: secondaryColor,
                         ),
                         filled: true,
-                        fillColor: const Color(0xFF151B3D),
+                        fillColor: cardColor,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(15),
                           borderSide: BorderSide.none,
@@ -165,12 +170,14 @@ class HomePage extends StatelessWidget {
 
                     const SizedBox(height: 28),
 
-                    const VotingCard(),
+                    // Menggantikan countdown dengan peringkat trainee.
+                    buildRankingSection(context, provider),
 
                     const SizedBox(height: 30),
 
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      mainAxisAlignment:
+                      MainAxisAlignment.spaceBetween,
                       children: [
                         const Text(
                           'Pilih Trainee',
@@ -209,7 +216,8 @@ class HomePage extends StatelessWidget {
                             shrinkWrap: true,
                             physics:
                             const NeverScrollableScrollPhysics(),
-                            itemCount: provider.filteredTrainees.length,
+                            itemCount:
+                            provider.filteredTrainees.length,
                             gridDelegate:
                             SliverGridDelegateWithFixedCrossAxisCount(
                               crossAxisCount: columns,
@@ -260,6 +268,222 @@ class HomePage extends StatelessWidget {
     );
   }
 
+  // Menampilkan tiga trainee dengan vote terbanyak.
+  Widget buildRankingSection(
+      BuildContext context,
+      TraineeProvider provider,
+      ) {
+    final rankings = provider.rankedTrainees.take(3).toList();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: accentColor.withValues(alpha: 0.25),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(
+                Icons.emoji_events_outlined,
+                color: accentColor,
+                size: 26,
+              ),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Peringkat Trainee',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+              Icon(
+                Icons.circle,
+                size: 8,
+                color: Colors.greenAccent,
+              ),
+              SizedBox(width: 5),
+              Text(
+                'Live',
+                style: TextStyle(
+                  color: Colors.greenAccent,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 6),
+
+          const Text(
+            'peringkat berubah mengikuti total vote.',
+            style: TextStyle(
+              fontSize: 12,
+              color: secondaryColor,
+            ),
+          ),
+
+          const SizedBox(height: 18),
+
+          if (rankings.isEmpty)
+            const Text(
+              'belum ada data peringkat.',
+              style: TextStyle(color: secondaryColor),
+            )
+          else
+            ...rankings.asMap().entries.map((entry) {
+              final index = entry.key;
+              final trainee = entry.value;
+
+              return buildRankingRow(
+                context,
+                trainee,
+                index + 1,
+              );
+            }),
+
+          const SizedBox(height: 10),
+
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton(
+              onPressed: () {
+                showModalBottomSheet<void>(
+                  context: context,
+                  isScrollControlled: true,
+                  backgroundColor: cardColor,
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(24),
+                    ),
+                  ),
+                  builder: (_) => const AllRankingsSheet(),
+                );
+              },
+              style: OutlinedButton.styleFrom(
+                foregroundColor: accentColor,
+                side: const BorderSide(color: accentColor),
+                padding: const EdgeInsets.symmetric(vertical: 13),
+              ),
+              child: const Text('Lihat Semua Peringkat'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Baris peringkat yang dapat dibuka untuk melihat detail trainee.
+  Widget buildRankingRow(
+      BuildContext context,
+      Map<String, dynamic> trainee,
+      int rank,
+      ) {
+    final name = trainee['name'].toString();
+    final image = trainee['image'].toString();
+    final votes = (trainee['votes'] as num?)?.toInt() ?? 0;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => TraineeDetailPage(
+              traineeName: name,
+            ),
+          ),
+        );
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 9),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 30,
+              child: Text(
+                '$rank',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: rank == 1
+                      ? const Color(0xFFFFD76A)
+                      : rank == 2
+                      ? const Color(0xFFD4D8E5)
+                      : rank == 3
+                      ? const Color(0xFFDAA078)
+                      : secondaryColor,
+                ),
+              ),
+            ),
+
+            const SizedBox(width: 8),
+
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.asset(
+                image,
+                width: 48,
+                height: 48,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => Container(
+                  width: 48,
+                  height: 48,
+                  color: const Color(0xFF252D55),
+                  child: const Icon(
+                    Icons.person,
+                    color: secondaryColor,
+                  ),
+                ),
+              ),
+            ),
+
+            const SizedBox(width: 12),
+
+            Expanded(
+              child: Text(
+                name,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  '$votes',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const Text(
+                  'vote',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: secondaryColor,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget buildHeader(BuildContext context) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -289,3 +513,138 @@ class HomePage extends StatelessWidget {
     );
   }
 }
+
+// Bottom sheet untuk melihat peringkat seluruh trainee.
+
+class AllRankingsSheet extends StatelessWidget {
+  const AllRankingsSheet({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    // Widget ini dibangun ulang ketika TraineeProvider berubah.
+    return Consumer<TraineeProvider>(
+      builder: (context, provider, child) {
+        // Ambil data peringkat terbaru setiap kali ada perubahan.
+        final rankings = provider.rankedTrainees;
+
+        return SafeArea(
+          child: FractionallySizedBox(
+            heightFactor: 0.85,
+            child: Column(
+              children: [
+                const SizedBox(height: 12),
+
+                Container(
+                  width: 42,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFAEB6D9),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+
+                const Padding(
+                  padding: EdgeInsets.all(20),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.emoji_events,
+                        color: Color(0xFF8B7FFF),
+                        size: 28,
+                      ),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Peringkat Semua Trainee',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 19,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 20),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'diurutkan berdasarkan total vote terbanyak.',
+                      style: TextStyle(
+                        color: Color(0xFFAEB6D9),
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 10),
+
+                Expanded(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    itemCount: rankings.length,
+                    itemBuilder: (context, index) {
+                      final trainee = rankings[index];
+                      final votes =
+                          (trainee['votes'] as num?)?.toInt() ?? 0;
+
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: ListTile(
+                          onTap: () {
+                            Navigator.pop(context);
+
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => TraineeDetailPage(
+                                  traineeName:
+                                  trainee['name'].toString(),
+                                ),
+                              ),
+                            );
+                          },
+                          leading: CircleAvatar(
+                            backgroundColor: const Color(0xFF252D55),
+                            child: Text(
+                              '${index + 1}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          title: Text(
+                            trainee['name'].toString(),
+                            style: const TextStyle(
+                              color: Colors.white,
+                            ),
+                          ),
+                          subtitle: Text(
+                            '$votes vote',
+                            style: const TextStyle(
+                              color: Color(0xFFAEB6D9),
+                            ),
+                          ),
+                          trailing: const Icon(
+                            Icons.chevron_right,
+                            color: Color(0xFF8B7FFF),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+

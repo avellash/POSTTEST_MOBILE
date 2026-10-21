@@ -1,3 +1,4 @@
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -5,6 +6,16 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 class TraineeProvider extends ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  // Memantau perubahan status login pengguna.
+  StreamSubscription<User?>? _authSubscription;
+
+  // Memantau perubahan data vote dari Firestore.
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>?
+  _votesSubscription;
+
+  // Menyimpan total vote masing-masing trainee.
+  Map<String, int> totalVotesByTrainee = {};
 
   // Mengatur halaman navigasi dan trainee yang dipilih.
   int selectedIndex = 0;
@@ -28,7 +39,33 @@ class TraineeProvider extends ChangeNotifier {
   List<Map<String, dynamic>> votingHistory = [];
   List<Map<String, dynamic>> _favoriteTrainees = [];
 
-  // Daftar trainee tetap menggunakan aset project kamu.
+  // Memulai listener setelah status autentikasi diketahui.
+  TraineeProvider() {
+    _authSubscription =
+        FirebaseAuth.instance.authStateChanges().listen((user) {
+          if (user != null) {
+            // Pengguna sudah login, mulai pantau vote.
+            _listenToVotes();
+
+            // Memuat data pengguna setelah login.
+            loadUserData();
+          } else {
+            // Menghentikan listener vote ketika logout.
+            _votesSubscription?.cancel();
+            _votesSubscription = null;
+
+            // Mengosongkan data khusus pengguna.
+            voteCount = 0;
+            votingHistory = [];
+            _favoriteTrainees = [];
+            totalVotesByTrainee = {};
+
+            notifyListeners();
+          }
+        });
+  }
+
+  // Daftar trainee dan deskripsinya.
   final List<Map<String, dynamic>> trainees = [
     {
       'name': 'Fuko',
@@ -44,9 +81,9 @@ class TraineeProvider extends ChangeNotifier {
       'name': 'Gyuri',
       'image': 'assets/images/gyuri_2.jpg',
       'description': 'Nama lengkap: Kim Gyu-ri (김규리)\n\n'
-      'Tanggal lahir: 15 September 2008\n\n'
-        'Zodiak: Virgo ♍\n\n'
-        'Deskripsi: Gyuri adalah trainee asal Korea Selatan yang juga dikenal sebagai aktris cilik dan model. Ia pernah membintangi beberapa drama Korea sebelum mengikuti i-LAND 2. Dengan kepribadian yang menarik serta pengalaman di dunia hiburan sejak usia muda, Gyuri menunjukkan potensi dan semangatnya untuk berkembang sebagai idol K-pop.',
+          'Tanggal lahir: 15 September 2008\n\n'
+          'Zodiak: Virgo ♍\n\n'
+          'Deskripsi: Gyuri adalah trainee asal Korea Selatan yang juga dikenal sebagai aktris cilik dan model. Ia pernah membintangi beberapa drama Korea sebelum mengikuti i-LAND 2. Dengan kepribadian yang menarik serta pengalaman di dunia hiburan sejak usia muda, Gyuri menunjukkan potensi dan semangatnya untuk berkembang sebagai idol K-pop.',
       'icon': Icons.person,
       'votes': 0,
     },
@@ -134,10 +171,150 @@ class TraineeProvider extends ChangeNotifier {
 
   // Mengambil nama trainee untuk halaman voting.
   List<String> get voteTrainees {
-    return trainees.map((trainee) => trainee['name'] as String).toList();
+    return trainees
+        .map((trainee) => trainee['name'] as String)
+        .toList();
   }
 
-  // Menghitung sisa kuota vote akun yang sedang login.
+  // Menghasilkan ID konsisten berdasarkan nama trainee.
+  String _traineeId(String name) {
+    return name.trim().toLowerCase().replaceAll(' ', '_');
+  }
+
+  // Mencocokkan ID atau nama dengan daftar trainee.
+  String? _resolveTraineeId(Map<String, dynamic> data) {
+    final rawId = data['traineeId']?.toString().trim() ?? '';
+    final rawName = data['traineeName']?.toString().trim() ?? '';
+
+    // Gunakan nama jika ID kosong atau berupa placeholder.
+    if (rawId.isEmpty ||
+        rawId.toLowerCase() == 'id_trainee' ||
+        rawId.toLowerCase() == 'null') {
+      if (rawName.isEmpty) return null;
+
+      for (final trainee in trainees) {
+        if ((trainee['name'] as String).toLowerCase() ==
+            rawName.toLowerCase()) {
+          return _traineeId(trainee['name'] as String);
+        }
+      }
+
+      return null;
+    }
+
+    // Jika ID cocok dengan trainee yang dikenal.
+    for (final trainee in trainees) {
+      final knownId = _traineeId(trainee['name'] as String);
+
+      if (rawId.toLowerCase() == knownId) {
+        return knownId;
+      }
+    }
+
+    // Jika ID tidak cocok, coba gunakan nama trainee.
+    if (rawName.isNotEmpty) {
+      for (final trainee in trainees) {
+        if ((trainee['name'] as String).toLowerCase() ==
+            rawName.toLowerCase()) {
+          return _traineeId(trainee['name'] as String);
+        }
+      }
+    }
+
+    return null;
+  }
+
+  // Memantau perubahan vote secara real-time.
+  void _listenToVotes() {
+    // Hindari memasang listener ganda.
+    _votesSubscription?.cancel();
+    _votesSubscription = null;
+
+    final user = FirebaseAuth.instance.currentUser;
+
+    // Jangan mulai listener jika belum login.
+    if (user == null) return;
+
+    debugPrint('Memulai listener vote untuk UID: ${user.uid}');
+
+    _votesSubscription =
+        _firestore.collection('votes').snapshots().listen(
+              (snapshot) {
+            final counts = <String, int>{};
+
+            // Hitung ulang seluruh vote dari snapshot terbaru.
+            for (final doc in snapshot.docs) {
+              final data = doc.data();
+              final traineeId = _resolveTraineeId(data);
+
+              if (traineeId == null) {
+                debugPrint(
+                  'Vote dilewati karena trainee tidak dikenali: ${doc.id}',
+                );
+                continue;
+              }
+
+              counts[traineeId] = (counts[traineeId] ?? 0) + 1;
+            }
+
+            totalVotesByTrainee = counts;
+
+            debugPrint('Total vote trainee: $totalVotesByTrainee');
+
+            // Memberi tahu widget agar tampilan diperbarui.
+            notifyListeners();
+          },
+          onError: (Object error) {
+            debugPrint('Gagal memantau data vote: $error');
+          },
+        );
+  }
+
+  // Mengurutkan trainee berdasarkan vote terbanyak.
+  List<Map<String, dynamic>> get rankedTrainees {
+    final result = trainees.map((trainee) {
+      final id = _traineeId(trainee['name'] as String);
+
+      return {
+        ...trainee,
+        'votes': totalVotesByTrainee[id] ?? 0,
+      };
+    }).toList();
+
+    result.sort((a, b) {
+      final votesA = (a['votes'] as num).toInt();
+      final votesB = (b['votes'] as num).toInt();
+
+      final comparison = votesB.compareTo(votesA);
+
+      // Jika jumlah vote sama, urutkan berdasarkan nama.
+      if (comparison == 0) {
+        return a['name'].toString().compareTo(
+          b['name'].toString(),
+        );
+      }
+
+      return comparison;
+    });
+
+    return result;
+  }
+
+  // Mengambil jumlah vote seorang trainee.
+  int getTraineeVoteCount(String traineeName) {
+    return totalVotesByTrainee[_traineeId(traineeName)] ?? 0;
+  }
+
+  // Mengambil peringkat seorang trainee.
+  int? getTraineeRank(String traineeName) {
+    final index = rankedTrainees.indexWhere(
+          (trainee) => trainee['name'] == traineeName,
+    );
+
+    return index == -1 ? null : index + 1;
+  }
+
+  // Menghitung sisa kuota vote.
   int get remainingVotes {
     final remaining = maxVotes - voteCount;
     return remaining < 0 ? 0 : remaining;
@@ -145,6 +322,15 @@ class TraineeProvider extends ChangeNotifier {
 
   // Memeriksa apakah kuota vote sudah habis.
   bool get hasReachedVoteLimit => voteCount >= maxVotes;
+
+  // Mengambil dokumen akun pengguna yang sedang login.
+  DocumentReference<Map<String, dynamic>>? get _userDocument {
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) return null;
+
+    return _firestore.collection('users').doc(user.uid);
+  }
 
   // Mengambil daftar trainee favorit.
   List<Map<String, dynamic>> get favoriteTrainees {
@@ -158,21 +344,7 @@ class TraineeProvider extends ChangeNotifier {
     );
   }
 
-  // Menghasilkan ID konsisten berdasarkan nama trainee.
-  String _traineeId(String name) {
-    return name.toLowerCase().replaceAll(' ', '_');
-  }
-
-  // Mengambil dokumen akun pengguna yang sedang login.
-  DocumentReference<Map<String, dynamic>>? get _userDocument {
-    final user = FirebaseAuth.instance.currentUser;
-
-    if (user == null) return null;
-
-    return _firestore.collection('users').doc(user.uid);
-  }
-
-  // Membaca jumlah vote, riwayat, dan favorit dari Firestore.
+  // Membaca jumlah vote, riwayat, dan favorit pengguna.
   Future<void> loadUserData() async {
     final user = FirebaseAuth.instance.currentUser;
 
@@ -190,13 +362,12 @@ class TraineeProvider extends ChangeNotifier {
     try {
       final userRef = _firestore.collection('users').doc(user.uid);
 
-      // Mengambil jumlah vote yang tersimpan.
       final userSnapshot = await userRef.get();
       final userData = userSnapshot.data();
 
       voteCount = (userData?['voteCount'] as num?)?.toInt() ?? 0;
 
-      // Mengambil riwayat voting milik akun ini saja.
+      // Mengambil riwayat voting akun yang sedang login.
       final historySnapshot = await _firestore
           .collection('votes')
           .where('userId', isEqualTo: user.uid)
@@ -209,7 +380,6 @@ class TraineeProvider extends ChangeNotifier {
         };
       }).toList();
 
-      // Mengurutkan riwayat berdasarkan waktu terbaru.
       votingHistory.sort((a, b) {
         final timeA = a['votedAt'];
         final timeB = b['votedAt'];
@@ -225,7 +395,7 @@ class TraineeProvider extends ChangeNotifier {
         return dateB.compareTo(dateA);
       });
 
-      // Mengambil favorit yang tersimpan pada akun pengguna.
+      // Mengambil favorit pengguna.
       final favoriteSnapshot =
       await userRef.collection('favorites').get();
 
@@ -240,6 +410,7 @@ class TraineeProvider extends ChangeNotifier {
             'image': '',
             'description': '',
             'icon': Icons.person,
+            'votes': 0,
           },
         );
 
@@ -258,7 +429,6 @@ class TraineeProvider extends ChangeNotifier {
   }
 
   // Mengirim vote ke Firestore dengan transaksi.
-  // Transaksi membaca dan memperbarui kuota secara bersamaan.
   Future<bool> submitVote() async {
     lastVoteError = null;
 
@@ -285,8 +455,6 @@ class TraineeProvider extends ChangeNotifier {
 
     final traineeName = voteTrainees[selectedVoteIndex];
     final traineeId = _traineeId(traineeName);
-
-    // ID vote dibuat sebelum transaksi dijalankan.
     final voteRef = _firestore.collection('votes').doc();
 
     try {
@@ -298,12 +466,10 @@ class TraineeProvider extends ChangeNotifier {
           final currentCount =
               (userData?['voteCount'] as num?)?.toInt() ?? 0;
 
-          // Mencegah vote jika akun sudah menggunakan 5 vote.
           if (currentCount >= maxVotes) {
             return false;
           }
 
-          // Memperbarui kuota dan menyimpan vote secara atomik.
           transaction.set(
             userRef,
             {
@@ -330,16 +496,17 @@ class TraineeProvider extends ChangeNotifier {
         return false;
       }
 
-      // Mengosongkan pilihan setelah vote berhasil disimpan.
       selectedVoteIndex = -1;
 
-      // Memuat ulang data agar riwayat dan kuota sesuai Firestore.
+      // Memperbarui riwayat dan kuota pengguna.
+      // Jumlah vote trainee diperbarui oleh listener.
       await loadUserData();
 
       return true;
     } catch (e) {
       debugPrint('Gagal menyimpan vote: $e');
-      lastVoteError = 'vote gagal disimpan. periksa koneksi dan coba lagi.';
+      lastVoteError =
+      'vote gagal disimpan. periksa koneksi dan coba lagi.';
       return false;
     } finally {
       isSubmittingVote = false;
@@ -347,7 +514,7 @@ class TraineeProvider extends ChangeNotifier {
     }
   }
 
-  // Menambah atau membatalkan favorit dan menyimpannya ke Firestore.
+  // Menambah atau membatalkan favorit.
   Future<bool> toggleFavorite(String traineeName) async {
     final user = FirebaseAuth.instance.currentUser;
     final userRef = _userDocument;
@@ -362,7 +529,8 @@ class TraineeProvider extends ChangeNotifier {
     if (trainee.isEmpty) return false;
 
     final traineeId = _traineeId(traineeName);
-    final favoriteRef = userRef.collection('favorites').doc(traineeId);
+    final favoriteRef =
+    userRef.collection('favorites').doc(traineeId);
 
     try {
       if (isFavorite(traineeName)) {
@@ -383,7 +551,7 @@ class TraineeProvider extends ChangeNotifier {
     }
   }
 
-  // Mengatur trainee yang dipilih di halaman voting.
+  // Mengatur trainee yang dipilih.
   void selectVote(int index) {
     if (index >= 0 &&
         index < voteTrainees.length &&
@@ -403,6 +571,7 @@ class TraineeProvider extends ChangeNotifier {
     }).toList();
   }
 
+  // Mengubah halaman navigasi.
   void changePage(int index) {
     if (index >= 0 && index < 4) {
       selectedIndex = index;
@@ -410,12 +579,22 @@ class TraineeProvider extends ChangeNotifier {
     }
   }
 
+  // Memperbarui kata kunci pencarian.
   void updateSearch(String value) {
     searchQuery = value;
     notifyListeners();
   }
 
+  // Memuat ulang data pengguna dari homepage.
   Future<void> refreshHome() async {
     await loadUserData();
+  }
+
+  // Menghentikan seluruh listener saat Provider dihancurkan.
+  @override
+  void dispose() {
+    _authSubscription?.cancel();
+    _votesSubscription?.cancel();
+    super.dispose();
   }
 }
