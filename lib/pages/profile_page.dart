@@ -1,390 +1,284 @@
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
-class ProfilePage extends StatelessWidget {
+import '../providers/trainee_provider.dart';
+
+class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
 
-  // Data contoh untuk tampilan riwayat voting.
-  // Nantinya data ini akan diambil dari Firebase.
-  static const List<Map<String, String>> votingHistory = [
-    {
-      'name': 'Fuko',
-      'image': 'assets/images/fuko_2.jpg',
-    },
-    {
-      'name': 'Jeemin',
-      'image': 'assets/images/jeemin_1.jpg',
-    },
-    {
-      'name': 'Koko',
-      'image': 'assets/images/koko_2.jpg',
-    },
-  ];
+  @override
+  State<ProfilePage> createState() => _ProfilePageState();
+}
 
-  // Data contoh untuk tampilan trainee favorit.
-  static const List<Map<String, String>> favoriteTrainees = [
-    {
-      'name': 'Gyuri',
-      'image': 'assets/images/gyuri_2.jpg',
-    },
-    {
-      'name': 'Saebi',
-      'image': 'assets/images/saebi_2.jpg',
-    },
-    {
-      'name': 'Jiyoon',
-      'image': 'assets/images/jiyoon_1.jpg',
-    },
-  ];
+class _ProfilePageState extends State<ProfilePage> {
+  @override
+  void initState() {
+    super.initState();
 
-  // Warna yang mengikuti tema gelap aplikasi.
-  static const Color backgroundColor = Color(0xFF101326);
-  static const Color cardColor = Color(0xFF151B3D);
-  static const Color accentColor = Color(0xFF8B7FFF);
-  static const Color secondaryText = Color(0xFFAEB6D9);
+    // Memuat data akun, riwayat, dan favorit dari Firestore.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        context.read<TraineeProvider>().loadUserData();
+      }
+    });
+  }
+
+  String _formatDate(dynamic value) {
+    if (value is Timestamp) {
+      final date = value.toDate();
+      final day = date.day.toString().padLeft(2, '0');
+      final month = date.month.toString().padLeft(2, '0');
+      final year = date.year.toString();
+      final hour = date.hour.toString().padLeft(2, '0');
+      final minute = date.minute.toString().padLeft(2, '0');
+
+      return '$day/$month/$year • $hour:$minute';
+    }
+
+    return 'waktu belum tersedia';
+  }
+
+  Future<void> _logout() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: const Color(0xFF151B3D),
+        title: const Text(
+          'keluar akun?',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: const Text(
+          'kamu akan keluar dari akun saat ini.',
+          style: TextStyle(color: Color(0xFFAEB6D9)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('batal'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('keluar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await FirebaseAuth.instance.signOut();
+
+      if (!mounted) return;
+
+      final provider = context.read<TraineeProvider>();
+      await provider.loadUserData();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isDesktop = screenWidth >= 900;
+    final provider = context.watch<TraineeProvider>();
+    final user = FirebaseAuth.instance.currentUser;
 
     return SafeArea(
-      child: Center(
-        // Membatasi lebar konten agar tetap rapi di layar besar.
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 900),
-          child: SingleChildScrollView(
-            padding: EdgeInsets.all(isDesktop ? 32 : 20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Judul halaman profil.
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.nightlight_round,
-                      color: accentColor,
-                      size: 28,
-                    ),
-                    const SizedBox(width: 10),
-                    Text(
-                      'my space',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: isDesktop ? 30 : 26,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
+      child: RefreshIndicator(
+        onRefresh: provider.loadUserData,
+        child: ListView(
+          padding: const EdgeInsets.all(20),
+          children: [
+            const Text(
+              'profil saya',
+              style: TextStyle(
+                fontSize: 26,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
 
-                const SizedBox(height: 22),
+            const SizedBox(height: 20),
 
-                // Header profil pengguna.
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [
-                        Color(0xFF302A60),
-                        Color(0xFF171C3D),
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(22),
-                    border: Border.all(
-                      color: const Color(0xFF514784),
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: const Color(0xFF151B3D),
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: Column(
+                children: [
+                  const CircleAvatar(
+                    radius: 42,
+                    backgroundColor: Color(0xFF252B50),
+                    child: Icon(
+                      Icons.person,
+                      size: 45,
+                      color: Color(0xFFB7AEFF),
                     ),
                   ),
-                  child: Column(
-                    children: [
-                      const CircleAvatar(
-                        radius: 43,
-                        backgroundColor: Color(0xFF494078),
+                  const SizedBox(height: 12),
+                  Text(
+                    user?.email ?? 'belum login',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'vote digunakan: ${provider.voteCount}/${TraineeProvider.maxVotes}',
+                    style: const TextStyle(
+                      color: Color(0xFFB7AEFF),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'sisa vote: ${provider.remainingVotes}',
+                    style: const TextStyle(
+                      color: Color(0xFFAEB6D9),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: user == null ? null : _logout,
+                      icon: const Icon(Icons.logout),
+                      label: const Text('keluar akun'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 28),
+
+            const Text(
+              'riwayat voting',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            if (provider.isLoadingUserData)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(16),
+                  child: CircularProgressIndicator(
+                    color: Color(0xFF8B7FFF),
+                  ),
+                ),
+              )
+            else if (user == null)
+              const Text(
+                'login untuk melihat riwayat voting.',
+                style: TextStyle(color: Color(0xFFAEB6D9)),
+              )
+            else if (provider.votingHistory.isEmpty)
+                const Text(
+                  'belum ada riwayat voting.',
+                  style: TextStyle(color: Color(0xFFAEB6D9)),
+                )
+              else
+                ...provider.votingHistory.map((vote) {
+                  final traineeName =
+                      vote['traineeName']?.toString() ??
+                          'trainee tidak diketahui';
+
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF151B3D),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: ListTile(
+                      leading: const CircleAvatar(
+                        backgroundColor: Color(0xFF252B50),
                         child: Icon(
-                          Icons.person,
+                          Icons.how_to_vote,
+                          color: Color(0xFFB7AEFF),
+                        ),
+                      ),
+                      title: Text(
+                        traineeName,
+                        style: const TextStyle(
                           color: Colors.white,
-                          size: 48,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
-
-                      const SizedBox(height: 14),
-
-                      const Text(
-                        'user profile',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 23,
-                          fontWeight: FontWeight.bold,
+                      subtitle: Text(
+                        _formatDate(vote['votedAt']),
+                        style: const TextStyle(
+                          color: Color(0xFFAEB6D9),
                         ),
                       ),
-
-                      const SizedBox(height: 5),
-
-                      const Text(
-                        '@iland_fan',
-                        style: TextStyle(
-                          color: secondaryText,
-                          fontSize: 14,
-                        ),
-                      ),
-
-                      const SizedBox(height: 12),
-
-                      const Text(
-                        'your i-land journey starts here ✦',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: Color(0xFFD2CBFF),
-                          fontSize: 13,
-                        ),
-                      ),
-
-                      const SizedBox(height: 20),
-
-                      // Tombol edit profil untuk tampilan sementara.
-                      OutlinedButton.icon(
-                        onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'fitur edit profil akan ditambahkan nanti.',
-                              ),
-                            ),
-                          );
-                        },
-                        icon: const Icon(Icons.edit_outlined),
-                        label: const Text('edit profil'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.white,
-                          side: const BorderSide(
-                            color: accentColor,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 28),
-
-                // Bagian riwayat voting.
-                _buildSectionTitle(
-                  icon: Icons.history,
-                  title: 'riwayat voting',
-                  subtitle: 'trainee yang pernah kamu pilih',
-                ),
-
-                const SizedBox(height: 14),
-
-                ...votingHistory.map(
-                      (trainee) => Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: _buildTraineeCard(
-                      trainee: trainee,
-                      trailing: const Icon(
-                        Icons.check_circle_outline,
-                        color: accentColor,
-                        size: 22,
-                      ),
-                      subtitle: 'pernah dipilih',
                     ),
-                  ),
+                  );
+                }),
+
+            const SizedBox(height: 24),
+
+            const Text(
+              'trainee favorit',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            if (provider.favoriteTrainees.isEmpty)
+              const Text(
+                'belum ada trainee favorit. tekan ikon hati pada kartu trainee untuk menambahkannya.',
+                style: TextStyle(
+                  color: Color(0xFFAEB6D9),
                 ),
+              )
+            else
+              ...provider.favoriteTrainees.map((trainee) {
+                final name =
+                    trainee['name']?.toString() ?? 'trainee';
 
-                const SizedBox(height: 22),
-
-                // Bagian trainee favorit.
-                _buildSectionTitle(
-                  icon: Icons.favorite,
-                  title: 'trainee favorit',
-                  subtitle: 'trainee yang kamu sukai',
-                ),
-
-                const SizedBox(height: 14),
-
-                ...favoriteTrainees.map(
-                      (trainee) => Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: _buildTraineeCard(
-                      trainee: trainee,
-                      trailing: const Icon(
-                        Icons.favorite,
-                        color: Color(0xFFFF8FA3),
-                        size: 22,
-                      ),
-                      subtitle: 'trainee favorit',
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-
-                // Tombol logout, belum dihubungkan ke autentikasi.
-                Container(
-                  width: double.infinity,
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 10),
                   decoration: BoxDecoration(
-                    color: cardColor,
+                    color: const Color(0xFF151B3D),
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: ListTile(
                     leading: const Icon(
-                      Icons.logout,
-                      color: Color(0xFFFF9DAE),
+                      Icons.favorite,
+                      color: Color(0xFFFF80AB),
                     ),
-                    title: const Text(
-                      'logout',
-                      style: TextStyle(
-                        color: Color(0xFFFF9DAE),
-                        fontWeight: FontWeight.w600,
+                    title: Text(
+                      name,
+                      style: const TextStyle(
+                        color: Colors.white,
                       ),
                     ),
-                    trailing: const Icon(
-                      Icons.chevron_right,
-                      color: secondaryText,
-                    ),
-                    onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'fitur logout akan dihubungkan nanti.',
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-
-                const SizedBox(height: 24),
-
-                const Center(
-                  child: Text(
-                    'i-LAND 2 • fan space ✦',
-                    style: TextStyle(
-                      color: Color(0xFF777FA8),
-                      fontSize: 12,
+                    trailing: IconButton(
+                      tooltip: 'hapus favorit',
+                      icon: const Icon(
+                        Icons.favorite_border,
+                        color: Color(0xFFFF80AB),
+                      ),
+                      onPressed: () async {
+                        await provider.toggleFavorite(name);
+                      },
                     ),
                   ),
-                ),
-              ],
-            ),
-          ),
+                );
+              }),
+          ],
         ),
-      ),
-    );
-  }
-
-  // Membuat judul dan deskripsi setiap bagian.
-  Widget _buildSectionTitle({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-  }) {
-    return Row(
-      children: [
-        Icon(
-          icon,
-          color: accentColor,
-          size: 25,
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 19,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                subtitle,
-                style: const TextStyle(
-                  color: secondaryText,
-                  fontSize: 12,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  // Membuat kartu trainee yang digunakan di dua bagian.
-  Widget _buildTraineeCard({
-    required Map<String, String> trainee,
-    required Widget trailing,
-    required String subtitle,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(
-          color: const Color(0xFF252B50),
-        ),
-      ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 14,
-          vertical: 5,
-        ),
-
-        // Menampilkan foto trainee dari folder assets.
-        leading: ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: Image.asset(
-            trainee['image']!,
-            width: 52,
-            height: 58,
-            fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) {
-              return Container(
-                width: 52,
-                height: 58,
-                color: const Color(0xFF252B50),
-                child: const Icon(
-                  Icons.person,
-                  color: secondaryText,
-                  size: 30,
-                ),
-              );
-            },
-          ),
-        ),
-
-        // Menampilkan nama dan keterangan trainee.
-        title: Text(
-          trainee['name']!,
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w600,
-            fontSize: 15,
-          ),
-        ),
-
-        subtitle: Padding(
-          padding: const EdgeInsets.only(top: 5),
-          child: Text(
-            subtitle,
-            style: const TextStyle(
-              color: secondaryText,
-              fontSize: 12,
-            ),
-          ),
-        ),
-
-        trailing: trailing,
       ),
     );
   }

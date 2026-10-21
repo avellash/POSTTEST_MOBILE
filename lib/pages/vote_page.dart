@@ -4,175 +4,228 @@ import 'package:provider/provider.dart';
 
 import '../providers/trainee_provider.dart';
 
-class VotePage extends StatelessWidget {
+class VotePage extends StatefulWidget {
   const VotePage({super.key});
 
   @override
+  State<VotePage> createState() => _VotePageState();
+}
+
+class _VotePageState extends State<VotePage> {
+  @override
+  void initState() {
+    super.initState();
+
+    // Memuat kuota dan riwayat saat halaman voting dibuka.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        context.read<TraineeProvider>().loadUserData();
+      }
+    });
+  }
+
+  // Mengirim vote trainee yang sudah dipilih.
+  Future<void> _sendVote() async {
+    final provider = context.read<TraineeProvider>();
+
+    final success = await provider.submitVote();
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          success
+              ? 'vote berhasil disimpan.'
+              : provider.lastVoteError ?? 'vote gagal disimpan.',
+        ),
+        backgroundColor: success
+            ? const Color(0xFF252B50)
+            : Colors.redAccent,
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // Mengambil pilihan voting dari Provider.
     final provider = context.watch<TraineeProvider>();
+    final isDesktop = MediaQuery.of(context).size.width >= 900;
 
-    // Menentukan lebar layar untuk menyesuaikan tampilan.
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isDesktop = screenWidth >= 900;
+    // Mengatur pilihan radio menggunakan RadioGroup.
+    return RadioGroup<int>(
+      groupValue: provider.selectedVoteIndex == -1
+          ? null
+          : provider.selectedVoteIndex,
+      onChanged: (value) {
+        if (provider.hasReachedVoteLimit ||
+            provider.isSubmittingVote) {
+          return;
+        }
 
-    return SafeArea(
-      child: Center(
-        // Membatasi lebar konten agar nyaman dibaca di desktop.
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 900),
-          child: Padding(
-            padding: EdgeInsets.all(isDesktop ? 32 : 20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Menampilkan judul halaman voting.
-                Text(
-                  'vote trainee',
-                  style: TextStyle(
-                    fontSize: isDesktop ? 32 : 26,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
+        if (value != null) {
+          provider.selectVote(value);
+        }
+      },
+
+      child: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 900),
+            child: Padding(
+              padding: EdgeInsets.all(isDesktop ? 32 : 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'vote trainee',
+                    style: TextStyle(
+                      fontSize: 26,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
                   ),
-                ),
 
-                const SizedBox(height: 8),
+                  const SizedBox(height: 8),
 
-                const Text(
-                  'pilih satu trainee favoritmu.',
-                  style: TextStyle(
-                    color: Color(0xFFAEB6D9),
+                  const Text(
+                    'pilih trainee yang ingin kamu dukung.',
+                    style: TextStyle(
+                      color: Color(0xFFAEB6D9),
+                    ),
                   ),
-                ),
 
-                const SizedBox(height: 20),
+                  const SizedBox(height: 16),
 
-                // Menampilkan daftar trainee yang dapat dipilih.
-                Expanded(
-                  child: provider.voteTrainees.isEmpty
-                      ? const Center(
+                  // Menampilkan sisa kuota vote pengguna.
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF151B3D),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                     child: Text(
-                      'belum ada trainee untuk dipilih.',
-                      style: TextStyle(
-                        color: Color(0xFFAEB6D9),
+                      'Sisa vote kamu: ${provider.remainingVotes} '
+                          'dari ${TraineeProvider.maxVotes}',
+                      style: const TextStyle(
+                        color: Color(0xFFB7AEFF),
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                  )
-                      : ListView.separated(
-                    itemCount: provider.voteTrainees.length,
-                    separatorBuilder: (context, index) =>
-                    const SizedBox(height: 8),
-                    itemBuilder: (context, index) {
-                      final trainee =
-                      provider.voteTrainees[index];
+                  ),
 
-                      // Memeriksa apakah trainee sedang dipilih.
-                      final isSelected =
-                          provider.selectedVoteIndex == index;
+                  const SizedBox(height: 16),
 
-                      return Card(
-                        margin: EdgeInsets.zero,
-                        color: isSelected
-                            ? const Color(0xFF302A60)
-                            : const Color(0xFF151B3D),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          side: BorderSide(
-                            color: isSelected
-                                ? const Color(0xFF8B7FFF)
-                                : Colors.transparent,
-                            width: 1.5,
-                          ),
-                        ),
-                        child: RadioListTile<int>(
-                          value: index,
-                          groupValue: provider.selectedVoteIndex,
+                  // Menampilkan daftar trainee yang dapat dipilih.
+                  Expanded(
+                    child: provider.isLoadingUserData
+                        ? const Center(
+                      child: CircularProgressIndicator(
+                        color: Color(0xFF8B7FFF),
+                      ),
+                    )
+                        : ListView.separated(
+                      itemCount: provider.trainees.length,
+                      separatorBuilder: (_, _) =>
+                      const SizedBox(height: 8),
+                      itemBuilder: (context, index) {
+                        final trainee =
+                        provider.trainees[index];
 
-                          // Menyimpan pilihan trainee ke Provider.
-                          onChanged: (value) {
-                            if (value != null) {
-                              provider.selectVote(value);
-                            }
-                          },
+                        final name =
+                        trainee['name'].toString();
 
-                          title: Text(
-                            trainee,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
+                        final image =
+                        trainee['image'].toString();
 
-                          secondary: CircleAvatar(
-                            backgroundColor:
-                            const Color(0xFF252B50),
-                            child: Icon(
-                              Icons.person,
+                        final isSelected =
+                            provider.selectedVoteIndex == index;
+
+                        return Card(
+                          margin: EdgeInsets.zero,
+                          color: isSelected
+                              ? const Color(0xFF302A60)
+                              : const Color(0xFF151B3D),
+                          shape: RoundedRectangleBorder(
+                            borderRadius:
+                            BorderRadius.circular(14),
+                            side: BorderSide(
                               color: isSelected
-                                  ? const Color(0xFFB7AEFF)
-                                  : const Color(0xFFAEB6D9),
+                                  ? const Color(0xFF8B7FFF)
+                                  : Colors.transparent,
+                              width: 1.5,
                             ),
                           ),
-
-                          activeColor:
-                          const Color(0xFF8B7FFF),
-                          controlAffinity:
-                          ListTileControlAffinity.trailing,
-                          contentPadding:
-                          const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 4,
+                          child: RadioListTile<int>(
+                            value: index,
+                            activeColor:
+                            const Color(0xFF8B7FFF),
+                            secondary: CircleAvatar(
+                              backgroundColor:
+                              const Color(0xFF252B50),
+                              backgroundImage: image.isNotEmpty
+                                  ? AssetImage(image)
+                                  : null,
+                              child: image.isEmpty
+                                  ? const Icon(
+                                Icons.person,
+                                color: Colors.white,
+                              )
+                                  : null,
+                            ),
+                            title: Text(
+                              name,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-
-                const SizedBox(height: 16),
-
-                // Menampilkan tombol kirim vote.
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: provider.selectedVoteIndex == -1
-                        ? null
-                        : () {
-                      // Mengambil nama trainee yang dipilih.
-                      final trainee = provider.voteTrainees[
-                      provider.selectedVoteIndex];
-
-                      // Menampilkan konfirmasi pilihan voting.
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            'vote untuk $trainee berhasil.',
-                          ),
-                          backgroundColor:
-                          const Color(0xFF252B50),
-                        ),
-                      );
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF8B7FFF),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 16,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: const Text(
-                      'kirim vote',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
+                        );
+                      },
                     ),
                   ),
-                ),
-              ],
+
+                  const SizedBox(height: 16),
+
+                  // Tombol mengirim vote ke Provider.
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed:
+                      provider.selectedVoteIndex == -1 ||
+                          provider.hasReachedVoteLimit ||
+                          provider.isSubmittingVote
+                          ? null
+                          : _sendVote,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF8B7FFF),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 16,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: provider.isSubmittingVote
+                          ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                          : Text(
+                        provider.hasReachedVoteLimit
+                            ? 'kuota vote habis'
+                            : 'kirim vote',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

@@ -1,8 +1,9 @@
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
 import '../pages/trainee_detail_page.dart';
 import '../providers/trainee_provider.dart';
-import 'package:provider/provider.dart';
 
 class PopularTrainee extends StatelessWidget {
   final String name;
@@ -14,19 +15,18 @@ class PopularTrainee extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // mengambil data trainee dari provider.
     final provider = context.watch<TraineeProvider>();
 
-    // mencari data trainee berdasarkan nama.
     final trainee = provider.trainees.firstWhere(
-          (item) => item['name'].toString() == name,
+          (item) =>
+      item['name'].toString().toLowerCase() ==
+          name.toLowerCase(),
       orElse: () => <String, dynamic>{},
     );
 
-    // mengambil lokasi foto trainee.
     final image = trainee['image']?.toString() ?? '';
+    final displayName = trainee['name']?.toString() ?? name;
 
-    // membuat item trainee populer.
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.symmetric(
@@ -40,25 +40,22 @@ class PopularTrainee extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
         onTap: () {
-          // membuka halaman detail trainee.
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => TraineeDetailPage(
-                traineeName: name,
+              builder: (_) => TraineeDetailPage(
+                traineeName: displayName,
               ),
             ),
           );
         },
         child: Row(
           children: [
-            // menampilkan foto trainee berbentuk lingkaran.
             CircleAvatar(
               radius: 25,
               backgroundColor: const Color(0xFF252B50),
-              backgroundImage: image.isNotEmpty
-                  ? AssetImage(image)
-                  : null,
+              backgroundImage:
+              image.isNotEmpty ? AssetImage(image) : null,
               child: image.isEmpty
                   ? const Icon(
                 Icons.person,
@@ -66,20 +63,17 @@ class PopularTrainee extends StatelessWidget {
               )
                   : null,
             ),
-
             const SizedBox(width: 12),
-
-            // menampilkan nama trainee.
             Expanded(
               child: Text(
-                name,
+                displayName,
                 style: const TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
+                  color: Colors.white,
                 ),
               ),
             ),
-
             const Icon(
               Icons.chevron_right,
               color: Color(0xFFAEB6D9),

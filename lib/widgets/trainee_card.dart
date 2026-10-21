@@ -1,6 +1,8 @@
 
 import 'package:flutter/material.dart';
-import '../pages/trainee_detail_page.dart';
+import 'package:provider/provider.dart';
+
+import '../providers/trainee_provider.dart';
 
 class TraineeCard extends StatelessWidget {
   final String name;
@@ -16,12 +18,13 @@ class TraineeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Membuat kartu trainee dengan animasi.
+    final provider = context.watch<TraineeProvider>();
+    final isFavorite = provider.isFavorite(name);
+
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0.9, end: 1),
       duration: const Duration(milliseconds: 400),
       builder: (context, scale, child) {
-        // Memberikan efek animasi pada kartu.
         return Transform.scale(
           scale: scale,
           child: child,
@@ -36,7 +39,6 @@ class TraineeCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Menampilkan foto trainee dari assets.
             Expanded(
               child: Container(
                 width: double.infinity,
@@ -49,8 +51,6 @@ class TraineeCard extends StatelessWidget {
                   image,
                   width: double.infinity,
                   fit: BoxFit.cover,
-
-                  // Menampilkan ikon jika foto gagal dimuat.
                   errorBuilder: (context, error, stackTrace) {
                     return Center(
                       child: Icon(
@@ -64,34 +64,72 @@ class TraineeCard extends StatelessWidget {
               ),
             ),
 
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
 
-            // Menampilkan nama trainee.
-            Text(
-              name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  tooltip: isFavorite
+                      ? 'hapus dari favorit'
+                      : 'tambah ke favorit',
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  onPressed: () async {
+                    final success =
+                    await provider.toggleFavorite(name);
+
+                    if (!context.mounted) return;
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          success
+                              ? (isFavorite
+                              ? '$name dihapus dari favorit.'
+                              : '$name ditambahkan ke favorit.')
+                              : 'favorit gagal diperbarui. pastikan kamu sudah login.',
+                        ),
+                      ),
+                    );
+                  },
+                  icon: Icon(
+                    isFavorite
+                        ? Icons.favorite
+                        : Icons.favorite_border,
+                    color: const Color(0xFFFF80AB),
+                  ),
+                ),
+              ],
             ),
 
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
 
-            // Membuka halaman detail trainee.
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => TraineeDetailPage(
-                        traineeName: name,
-                      ),
-                    ),
-                  );
+                  final index =
+                  provider.voteTrainees.indexOf(name);
+
+                  if (index >= 0 &&
+                      !provider.hasReachedVoteLimit) {
+                    provider.selectVote(index);
+                  }
+
+                  // Membuka halaman Vote Trainee, bukan halaman detail.
+                  provider.changePage(1);
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF8B7FFF),

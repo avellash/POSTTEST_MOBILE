@@ -14,7 +14,6 @@ class TraineeDetailPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Mengambil data trainee dari Provider.
     final provider = context.watch<TraineeProvider>();
 
     // Mencari data trainee berdasarkan nama.
@@ -25,250 +24,189 @@ class TraineeDetailPage extends StatelessWidget {
       orElse: () => <String, dynamic>{},
     );
 
-    // Menampilkan pesan jika trainee tidak ditemukan.
+    // Menampilkan halaman jika data trainee tidak ditemukan.
     if (trainee.isEmpty) {
       return Scaffold(
         backgroundColor: const Color(0xFF0B1028),
         appBar: AppBar(
-          title: const Text('Detail Trainee'),
+          backgroundColor: const Color(0xFF151B3D),
+          title: const Text('detail trainee'),
         ),
         body: const Center(
           child: Text(
-            'Data trainee tidak ditemukan.',
+            'data trainee tidak ditemukan.',
             style: TextStyle(color: Colors.white),
           ),
         ),
       );
     }
 
-    // Mengambil informasi trainee.
     final name = trainee['name'].toString();
     final image = trainee['image']?.toString() ?? '';
     final description =
-        trainee['description']?.toString() ?? 'Belum ada deskripsi.';
-    final votes = trainee['votes'] ?? 0;
-
-    // Memeriksa ukuran layar untuk menentukan layout.
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isDesktop = screenWidth >= 900;
+        trainee['description']?.toString() ??
+            'belum ada deskripsi.';
+    final isFavorite = provider.isFavorite(name);
 
     return Scaffold(
       backgroundColor: const Color(0xFF0B1028),
-
-      // Menampilkan app bar halaman detail.
       appBar: AppBar(
         backgroundColor: const Color(0xFF151B3D),
-        foregroundColor: Colors.white,
-        title: const Text('Detail Trainee'),
-      ),
+        title: const Text('detail trainee'),
+        actions: [
+          // Tombol untuk menambah atau menghapus favorit.
+          IconButton(
+            tooltip:
+            isFavorite ? 'hapus favorit' : 'tambah favorit',
+            onPressed: () async {
+              final success =
+              await provider.toggleFavorite(name);
 
-      // Membuat konten dapat di-scroll pada layar kecil.
-      body: SingleChildScrollView(
-        padding: EdgeInsets.all(isDesktop ? 32 : 20),
-        child: Center(
-          // Membatasi lebar konten di desktop.
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 1100),
-            child: isDesktop
-            // Layout dua kolom untuk desktop.
-                ? Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Menampilkan foto trainee.
-                Expanded(
-                  flex: 5,
-                  child: buildTraineeImage(image),
-                ),
+              if (!context.mounted) return;
 
-                const SizedBox(width: 32),
-
-                // Menampilkan informasi trainee.
-                Expanded(
-                  flex: 6,
-                  child: buildTraineeInfo(
-                    context,
-                    provider,
-                    name,
-                    description,
-                    votes,
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    success
+                        ? (isFavorite
+                        ? '$name dihapus dari favorit.'
+                        : '$name ditambahkan ke favorit.')
+                        : 'favorit gagal diperbarui. pastikan kamu sudah login.',
                   ),
                 ),
-              ],
-            )
-            // Layout satu kolom untuk mobile.
-                : Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                buildTraineeImage(image),
-
-                const SizedBox(height: 24),
-
-                buildTraineeInfo(
-                  context,
-                  provider,
-                  name,
-                  description,
-                  votes,
-                ),
-              ],
+              );
+            },
+            icon: Icon(
+              isFavorite
+                  ? Icons.favorite
+                  : Icons.favorite_border,
+              color: const Color(0xFFFF80AB),
             ),
           ),
-        ),
+        ],
       ),
-    );
-  }
-
-  // Membuat foto trainee yang menyesuaikan ukuran kontainer.
-  Widget buildTraineeImage(String image) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(20),
-      child: AspectRatio(
-        aspectRatio: 3 / 4,
-        child: image.isNotEmpty
-            ? Image.asset(
-          image,
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) {
-            return buildImagePlaceholder();
-          },
-        )
-            : buildImagePlaceholder(),
-      ),
-    );
-  }
-
-  // Menampilkan ikon pengganti jika foto tidak tersedia.
-  Widget buildImagePlaceholder() {
-    return Container(
-      color: const Color(0xFF252B50),
-      alignment: Alignment.center,
-      child: const Icon(
-        Icons.person,
-        size: 100,
-        color: Color(0xFFAEB6D9),
-      ),
-    );
-  }
-
-  // Membuat informasi, deskripsi, jumlah vote, dan tombol vote.
-  Widget buildTraineeInfo(
-      BuildContext context,
-      TraineeProvider provider,
-      String name,
-      String description,
-      dynamic votes,
-      ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Menampilkan nama trainee.
-        Text(
-          name,
-          style: const TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-
-        const SizedBox(height: 24),
-
-        // Menampilkan judul deskripsi.
-        const Text(
-          'Tentang Trainee',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFFAEB6D9),
-          ),
-        ),
-
-        const SizedBox(height: 12),
-
-        // Menampilkan deskripsi dengan jarak antarbaris.
-        Text(
-          description,
-          textAlign: TextAlign.justify,
-          style: const TextStyle(
-            fontSize: 14,
-            color: Colors.white70,
-            height: 1.8,
-          ),
-        ),
-
-        const SizedBox(height: 24),
-
-        // Menampilkan jumlah vote trainee.
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: const Color(0xFF151B3D),
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: Row(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 700),
+          child: ListView(
+            padding: const EdgeInsets.all(20),
             children: [
-              const Icon(
-                Icons.favorite,
-                color: Color(0xFFFF80AB),
-                size: 26,
+              // Area foto trainee.
+
+
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  // Menentukan lebar foto sesuai lebar halaman.
+                  final imageWidth = constraints.maxWidth;
+
+                  return Container(
+                    width: imageWidth,
+                    height: imageWidth * 5 / 4,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF151B3D),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: image.isNotEmpty
+                        ? Image.asset(
+                      image,
+                      width: imageWidth,
+                      height: imageWidth * 5 / 4,
+                      fit: BoxFit.fill,
+                      errorBuilder: (_, _, _) {
+                        return const Icon(
+                          Icons.person,
+                          size: 100,
+                          color: Color(0xFFAEB6D9),
+                        );
+                      },
+                    )
+                        : const Icon(
+                      Icons.person,
+                      size: 100,
+                      color: Color(0xFFAEB6D9),
+                    ),
+                  );
+                },
               ),
-              const SizedBox(width: 12),
-              const Text(
-                'Total Vote',
-                style: TextStyle(
-                  fontSize: 16,
+
+
+              const SizedBox(height: 22),
+
+              // Nama trainee.
+              Text(
+                name,
+                style: const TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
                   color: Colors.white,
                 ),
               ),
-              const Spacer(),
-              Text(
-                '$votes',
-                style: const TextStyle(
+
+              const SizedBox(height: 12),
+
+              // Judul bagian deskripsi.
+              const Text(
+                'tentang trainee',
+                style: TextStyle(
                   fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFFB7AEFF),
+                ),
+              ),
+
+              const SizedBox(height: 8),
+
+              // Deskripsi trainee.
+              Text(
+                description,
+                style: const TextStyle(
+                  fontSize: 15,
+                  height: 1.6,
+                  color: Color(0xFFAEB6D9),
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              // Tombol untuk menuju halaman voting.
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    final index =
+                    provider.voteTrainees.indexOf(name);
+
+                    // Memilih trainee sebelum berpindah halaman.
+                    if (index >= 0 &&
+                        !provider.hasReachedVoteLimit) {
+                      provider.selectVote(index);
+                    }
+
+                    // Berpindah ke halaman voting.
+                    provider.changePage(1);
+
+                    // Menutup halaman detail.
+                    Navigator.pop(context);
+                  },
+                  icon: const Icon(Icons.how_to_vote),
+                  label: const Text('vote trainee ini'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF8B7FFF),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 15,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
                 ),
               ),
             ],
           ),
         ),
-
-        const SizedBox(height: 24),
-
-        // Membuat tombol vote untuk trainee.
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton.icon(
-            onPressed: () {
-              // Menambahkan vote untuk trainee melalui Provider.
-              provider.voteForTrainee(name);
-
-              // Menampilkan notifikasi setelah vote.
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Vote untuk $name berhasil!'),
-                  backgroundColor: const Color(0xFF252B50),
-                ),
-              );
-            },
-            icon: const Icon(Icons.favorite),
-            label: const Text('Vote Trainee'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF6979F8),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              textStyle: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
-            ),
-          ),
-        ),
-      ],
+      ),
     );
   }
 }
